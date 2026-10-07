@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { useId, useState } from "react";
+import { startTransition, useActionState, useId, useState } from "react";
 
 export type FormState = {
   ok?: boolean;
@@ -27,6 +27,20 @@ export function SubmitButton({
       {pending ? (pendingLabel ?? "Saving…") : children}
     </button>
   );
+}
+
+/**
+ * Like useActionState, but submits without React's automatic form reset, so long
+ * edit forms keep what the seller typed (and what was saved) on screen.
+ */
+export function useEditForm(action: (prev: FormState, form: FormData) => Promise<FormState>) {
+  const [state, dispatch, pending] = useActionState<FormState, FormData>(action, {});
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    startTransition(() => dispatch(data));
+  };
+  return { state, onSubmit, pending };
 }
 
 type FieldProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "id"> & {
