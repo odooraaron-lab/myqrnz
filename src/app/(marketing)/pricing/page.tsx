@@ -30,7 +30,7 @@ export default function PricingPage() {
 
       <section className="mx-auto grid max-w-6xl gap-14 px-4 sm:px-6 lg:grid-cols-[1fr_1.15fr] lg:items-start">
         <Receipt />
-        <div>
+        <div className="min-w-0">
           <h2 className="font-semiwide text-2xl sm:text-3xl">What a year costs</h2>
           <p className="mt-3 max-w-[56ch] leading-relaxed text-ink-soft">
             Compared with a typical store builder at ${SUBSCRIPTION_MONTHLY} a month. Card processing fees apply to every

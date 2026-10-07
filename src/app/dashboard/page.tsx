@@ -93,7 +93,7 @@ export default async function DashboardHome({
               <p className="mt-2 text-ink-soft">Anyone with the link or QR code can browse and send orders.</p>
               <div className="mt-5 flex flex-wrap items-center gap-2">
                 <a href={url} target="_blank" rel="noopener" className="btn btn-primary">
-                  Open {shopHost(shop.subdomain)}
+                  Open your shop
                 </a>
                 <CopyButton value={url} label="Copy link" />
               </div>
