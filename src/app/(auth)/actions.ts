@@ -168,7 +168,8 @@ export async function loginAction(_prev: FormState, form: FormData): Promise<For
   }
   await createSession(user.id);
   const next = String(form.get("next") ?? "");
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
+  // Only follow same-site paths ("//x" and "/\x" would leave the site).
+  redirect(/^\/(?![/\\])/.test(next) ? next : "/dashboard");
 }
 
 export async function logoutAction() {
