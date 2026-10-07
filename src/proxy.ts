@@ -15,7 +15,7 @@ const ROOT = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "localhost:3000").toLowerCa
 const ROOT_HOSTNAME = ROOT.split(":")[0];
 
 // Paths that only make sense on the main domain.
-const ROOT_ONLY = /^\/(dashboard|login|register|forgot-password|reset-password|admin|logout)(\/|$)/;
+const ROOT_ONLY = /^\/(dashboard|login|register|forgot-password|reset-password|admin|logout|print)(\/|$)/;
 // Static assets that should never be rewritten into a shop.
 const STATIC_FILE = /\.(?:svg|png|jpe?g|webp|gif|ico|css|js|map|woff2?|ttf|webmanifest)$/i;
 
