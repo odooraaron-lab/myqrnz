@@ -6,7 +6,7 @@
  */
 export async function resizeImage(
   file: File,
-  opts: { max?: number; quality?: number; keepAlpha?: boolean } = {},
+  opts: { max?: number; quality?: number; keepAlpha?: boolean; png?: boolean } = {},
 ): Promise<{ blob: Blob; width: number; height: number; type: string }> {
   const max = opts.max ?? 1600;
   const quality = opts.quality ?? 0.84;
@@ -28,8 +28,9 @@ export async function resizeImage(
   ctx.drawImage(bitmap, 0, 0, width, height);
   if ("close" in bitmap && typeof bitmap.close === "function") bitmap.close();
 
-  let blob = await toBlob(canvas, "image/webp", quality);
-  if (!blob || blob.type !== "image/webp") {
+  // Logos stay PNG so share-card generators (which can't read WebP) can embed them.
+  let blob = opts.png ? await toBlob(canvas, "image/png", quality) : await toBlob(canvas, "image/webp", quality);
+  if (!blob || (!opts.png && blob.type !== "image/webp")) {
     blob = await toBlob(canvas, opts.keepAlpha ? "image/png" : "image/jpeg", quality);
   }
   if (!blob) throw new Error("Couldn't process that image. Try a different photo.");
@@ -63,8 +64,9 @@ async function loadBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {
 /** Upload a resized image to the app. Returns its public URL. */
 export async function uploadImage(file: File, kind: "logo" | "cover" | "listing") {
   const resized = await resizeImage(file, {
-    max: kind === "logo" ? 800 : kind === "cover" ? 2000 : 1600,
+    max: kind === "logo" ? 600 : kind === "cover" ? 2000 : 1600,
     keepAlpha: kind === "logo",
+    png: kind === "logo",
   });
   const ext = resized.type.split("/")[1] === "jpeg" ? "jpg" : resized.type.split("/")[1];
   const body = new FormData();
