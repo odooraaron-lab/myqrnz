@@ -1,41 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useDeferredValue, useEffect, useId, useState } from "react";
+import { useDeferredValue, useId, useState } from "react";
+import { useAvailability } from "@/components/useAvailability";
 import { site } from "@/config/site";
 import { qrTarget } from "@/lib/qr";
 import { suggestSubdomain } from "@/lib/subdomain";
 import { StallSign } from "./StallSign";
-
-type Status = { state: "idle" | "checking" | "free" | "taken" | "invalid"; message?: string };
-
-function useAvailability(slug: string): Status {
-  const [status, setStatus] = useState<Status>({ state: "idle" });
-  useEffect(() => {
-    if (!slug) {
-      setStatus({ state: "idle" });
-      return;
-    }
-    setStatus({ state: "checking" });
-    const ctrl = new AbortController();
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/subdomain-check?name=${encodeURIComponent(slug)}`, { signal: ctrl.signal });
-        const data = (await res.json()) as { available: boolean | null; problem: string | null };
-        if (data.available === null) setStatus({ state: "idle" });
-        else if (data.available) setStatus({ state: "free" });
-        else setStatus({ state: data.problem?.startsWith("Someone") ? "taken" : "invalid", message: data.problem ?? undefined });
-      } catch {
-        /* aborted or offline */
-      }
-    }, 350);
-    return () => {
-      clearTimeout(t);
-      ctrl.abort();
-    };
-  }, [slug]);
-  return status;
-}
 
 const host = site.rootDomain.split(":")[0];
 
