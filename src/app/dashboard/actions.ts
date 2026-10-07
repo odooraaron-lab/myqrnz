@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { FormState } from "@/components/forms";
 import { db } from "@/db";
-import { shops, users } from "@/db/schema";
+import { listingImages, listings, shops, users } from "@/db/schema";
 import {
   createSession,
   destroyAllSessions,
@@ -173,8 +173,12 @@ export async function deleteAccountAction(_prev: FormState, form: FormData): Pro
   if (!(await verifyPassword(String(form.get("password") ?? ""), user.passwordHash))) {
     return { errors: { password: "That password isn't right." } };
   }
-  await removeImage(shop.logoUrl);
-  await removeImage(shop.coverUrl);
+  const photos = await db
+    .select({ url: listingImages.url })
+    .from(listingImages)
+    .innerJoin(listings, eq(listings.id, listingImages.listingId))
+    .where(eq(listings.shopId, shop.id));
+  await Promise.all([shop.logoUrl, shop.coverUrl, ...photos.map((p) => p.url)].map((u) => removeImage(u)));
   await db.delete(users).where(eq(users.id, user.id)); // cascades to shop, products, sessions
   await destroySession();
   redirect("/?deleted=1");

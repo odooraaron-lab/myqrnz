@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { cache } from "react";
 import { db } from "@/db";
@@ -102,4 +102,13 @@ export async function recordVisit(shopId: string, source: "qr" | "web", userAgen
   } catch (err) {
     console.warn("[visits] could not record", err);
   }
+}
+
+export async function shopCategories(shopId: string) {
+  const rows = await db
+    .selectDistinct({ category: listings.category })
+    .from(listings)
+    .where(and(eq(listings.shopId, shopId), isNotNull(listings.category)))
+    .orderBy(asc(listings.category));
+  return rows.map((r) => r.category!).filter(Boolean);
 }
