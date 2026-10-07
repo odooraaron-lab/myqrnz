@@ -1,6 +1,9 @@
 import { shopUrl } from "@/config/site";
 import { getShopBySubdomain } from "@/lib/shops";
 
+// Per-request: content depends on the shop and changes as sellers edit.
+export const dynamic = "force-dynamic";
+
 export async function GET(_req: Request, ctx: { params: Promise<{ shop: string }> }) {
   const { shop: sub } = await ctx.params;
   const shop = await getShopBySubdomain(sub);

@@ -5,6 +5,9 @@ function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// Per-request: content depends on the shop and changes as sellers edit.
+export const dynamic = "force-dynamic";
+
 export async function GET(_req: Request, ctx: { params: Promise<{ shop: string }> }) {
   const { shop: sub } = await ctx.params;
   const shop = await getShopBySubdomain(sub);
