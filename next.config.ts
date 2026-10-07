@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Fonts read at runtime by the share-image generators.
+  outputFileTracingIncludes: {
+    "/**": ["./assets/fonts/**"],
+  },
   // Server actions handle photo uploads that are already resized in the browser,
   // so a modest limit is plenty.
   experimental: {

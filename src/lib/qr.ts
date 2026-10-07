@@ -75,7 +75,8 @@ export function qrSvg(text: string, opts: QrOptions = {}): string {
         if (dark(r, c) && !inFinder(r, c, size) && !inHole(r, c)) {
           let run = 1;
           while (c + run < size && dark(r, c + run) && !inFinder(r, c + run, size) && !inHole(r, c + run)) run++;
-          body += `M${c + o},${r + o}h${run}v1h${-run}z`;
+          // A hair of overlap stops seams appearing between rows when the code is scaled or rotated.
+          body += `M${c + o},${r + o}h${run + 0.02}v1.02h${-(run + 0.02)}z`;
           c += run;
         } else c++;
       }
@@ -123,7 +124,7 @@ export function qrSvg(text: string, opts: QrOptions = {}): string {
   const px = opts.size ? ` width="${opts.size}" height="${opts.size}"` : "";
   const title = opts.title ? `<title>${escapeAttr(opts.title)}</title>` : "";
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}"${px} shape-rendering="${style === "square" ? "crispEdges" : "geometricPrecision"}" role="img">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}"${px} role="img">` +
     title +
     `<rect width="${total}" height="${total}" fill="${bg}"/>` +
     `<path d="${body}" fill="${fg}"/>` +
