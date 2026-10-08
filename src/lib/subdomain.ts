@@ -13,6 +13,9 @@ export const RESERVED_SUBDOMAINS = new Set([
   "myqr", "my-qr", "qr", "qrcode", "official", "team", "staff", "security", "abuse", "postmaster",
   "hostmaster", "webmaster", "root", "system", "test", "testing", "dev", "staging", "preview", "demo",
   "beta", "alpha", "internal", "localhost", "example", "null", "undefined", "s",
+  // Used by other projects on this domain. Vercel sends these hosts to those
+  // projects, so a shop with one of these names would be unreachable.
+  "digitalsignage", "resthome", "reviews",
 ]);
 
 /** Turns free text ("Anna's Jams & Preserves") into a candidate name ("annas-jams-preserves"). */
