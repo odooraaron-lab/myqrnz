@@ -24,3 +24,12 @@ export function setupFeeRequired(shop: Pick<Shop, "setupPaidAt">) {
 export async function startSetupCheckout(_shop: Shop): Promise<{ url: string }> {
   throw new Error("Setup fee checkout isn't connected yet. Set PAYMENTS_ENABLED=false until Stripe is added.");
 }
+
+/**
+ * Real QR codes, downloads and printing unlock once the shop is live — and,
+ * when payments are on, once the setup fee is paid. Until then every code shown
+ * is a watermarked preview that points to myQR, not the shop.
+ */
+export function qrUnlocked(shop: Pick<Shop, "status" | "setupPaidAt">) {
+  return shop.status === "live" && !setupFeeRequired(shop);
+}

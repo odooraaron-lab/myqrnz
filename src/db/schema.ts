@@ -1,9 +1,11 @@
 import { relations, sql } from "drizzle-orm";
+import type { QrDesign } from "@/lib/qr-design";
 import {
   boolean,
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -84,6 +86,9 @@ export const shops = pgTable(
 
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
+
+    /** Saved QR code design from the QR studio. Null until the seller changes it. */
+    qrDesign: jsonb("qr_design").$type<QrDesign>(),
 
     status: text("status", { enum: ["draft", "live", "suspended"] }).notNull().default("draft"),
     publishedAt: timestamp("published_at", { withTimezone: true }),

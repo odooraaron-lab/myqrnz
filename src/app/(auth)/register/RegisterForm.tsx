@@ -6,7 +6,7 @@ import { Field, FormMessage, PasswordField, SubmitButton, type FormState } from 
 import { StallSign } from "@/components/marketing/StallSign";
 import { useAvailability } from "@/components/useAvailability";
 import { site } from "@/config/site";
-import { qrTarget } from "@/lib/qr";
+import { previewTarget } from "@/lib/qr";
 import { suggestSubdomain } from "@/lib/subdomain";
 import { registerAction } from "../actions";
 
@@ -123,7 +123,7 @@ export function RegisterForm({ initialName }: { initialName: string }) {
         <StallSign
           name={deferredName}
           address={`${deferredSub || "yourname"}.${host}`}
-          qrValue={qrTarget(`${site.protocol}://${deferredSub || "yourname"}.${host}`)}
+          qrValue={previewTarget(deferredSub || undefined)}
           sticker={false}
         />
         <p className="mt-10 text-center text-sm text-ink-soft">

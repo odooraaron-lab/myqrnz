@@ -3,9 +3,9 @@ import Link from "next/link";
 import { FaqList } from "@/components/marketing/Faqs";
 import { CtaBand, PageIntro } from "@/components/marketing/PageIntro";
 import { StallSign } from "@/components/marketing/StallSign";
-import { shopUrl, site } from "@/config/site";
+import { site } from "@/config/site";
 import { FAQS } from "@/content/faq";
-import { qrTarget } from "@/lib/qr";
+import { previewTarget } from "@/lib/qr";
 
 export const metadata: Metadata = {
   title: "Online store and QR code for market stall holders in NZ",
@@ -73,7 +73,8 @@ export default function MarketStallsPage() {
         <StallSign
           name="Harbourside Ceramics"
           address={`${example}.${site.rootDomain.split(":")[0]}`}
-          qrValue={qrTarget(shopUrl(example))}
+          qrValue={previewTarget(example)}
+          watermark={false}
           sticker={false}
         />
       </section>

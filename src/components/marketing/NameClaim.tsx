@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useDeferredValue, useId, useState } from "react";
 import { useAvailability } from "@/components/useAvailability";
 import { site } from "@/config/site";
-import { qrTarget } from "@/lib/qr";
+import { previewTarget } from "@/lib/qr";
 import { suggestSubdomain } from "@/lib/subdomain";
 import { StallSign } from "./StallSign";
 
@@ -65,7 +65,7 @@ export function NameClaimHero({ defaultName = "Tōtara Honey" }: { defaultName?:
         </p>
       </div>
 
-      <StallSign name={deferred} address={address} qrValue={qrTarget(`${site.protocol}://${address}`)} />
+      <StallSign name={deferred} address={address} qrValue={previewTarget(slug || undefined)} />
     </div>
   );
 }

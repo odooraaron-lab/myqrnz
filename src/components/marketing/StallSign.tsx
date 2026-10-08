@@ -1,37 +1,52 @@
 import { QrCode } from "@/components/QrCode";
+import { SHOWCASE_DESIGN, type QrDesign } from "@/lib/qr-design";
 
 /**
- * The printed sign a seller props up on their stall. Used as the hero visual
- * and mirrors the real A4 print template.
+ * The printed sign a seller props up on their stall. Used as the hero visual,
+ * on sign-up and in the QR studio. Codes here are previews unless told otherwise.
  */
 export function StallSign({
   name,
   address,
   qrValue,
   sticker = true,
+  design = SHOWCASE_DESIGN,
+  watermark = true,
+  cta = "Scan to shop online",
   className = "",
 }: {
   name: string;
   address: string;
   qrValue: string;
   sticker?: boolean;
+  design?: Partial<QrDesign>;
+  watermark?: boolean;
+  cta?: string;
   className?: string;
 }) {
   return (
     <figure className={`relative mx-auto w-full max-w-[360px] ${className}`}>
-      <div className="relative -rotate-[1.5deg] border-[1.5px] border-ink bg-card px-7 pb-7 pt-8 shadow-[0_1px_0_var(--color-line),0_18px_40px_-18px_rgb(25_28_58/0.35)]">
-        <p className="text-[0.9375rem] font-medium text-ink-soft">Scan to shop online</p>
+      <div className="relative -rotate-[1.5deg] border-[1.5px] border-ink bg-card px-[8%] pb-[8%] pt-[9%] shadow-[0_1px_0_var(--color-line),0_18px_40px_-18px_rgb(25_28_58/0.35)]">
+        <p className="text-[0.9375em] font-medium text-ink-soft">{cta}</p>
         <p
-          className="font-wide mt-2 line-clamp-2 break-words text-[clamp(1.6rem,4.5vw,2.1rem)] leading-[1.02] text-ink"
+          className="font-wide mt-2 line-clamp-2 break-words text-[clamp(1.25rem,4.5vw,2.1rem)] leading-[1.02] text-ink"
           aria-live="polite"
         >
           {name || "Your shop"}
         </p>
         <div className="mt-5 aspect-square w-full">
-          <QrCode value={qrValue} fg="#191c3a" margin={1} className="h-full w-full" label={`QR code linking to ${address}`} />
+          <QrCode
+            value={qrValue}
+            {...design}
+            frame="none"
+            margin={1}
+            watermark={watermark}
+            className="h-full w-full"
+            label={watermark ? `Preview QR code for ${address}` : `QR code linking to ${address}`}
+          />
         </div>
-        <p className="font-narrow mt-4 truncate text-center text-[1.05rem] font-semibold tracking-tight text-ink">{address}</p>
-        <p className="mt-1 text-center text-sm text-ink-soft">Order for pickup or delivery</p>
+        <p className="font-narrow mt-4 truncate text-center text-[1.05em] font-semibold tracking-tight text-ink">{address}</p>
+        <p className="mt-1 text-center text-[0.85em] text-ink-soft">Order for pickup or delivery</p>
       </div>
       {sticker && (
         <div
@@ -42,7 +57,9 @@ export function StallSign({
           <span className="mt-0.5 text-[0.75rem] font-semibold leading-tight">a month</span>
         </div>
       )}
-      <figcaption className="sr-only">Example printed stall sign with a QR code for {address}</figcaption>
+      <figcaption className="sr-only">
+        {watermark ? "Preview of a printed stall sign" : "Example printed stall sign"} with a QR code for {address}
+      </figcaption>
     </figure>
   );
 }

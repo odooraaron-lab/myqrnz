@@ -5,8 +5,10 @@ import { shopHost, shopUrl } from "@/config/site";
 import type { Shop } from "@/db/schema";
 import { requireSeller } from "@/lib/auth";
 import { formatPrice } from "@/lib/format";
-import { qrSvg, qrTarget } from "@/lib/qr";
-import { parseQrDesign, TEMPLATES, type QrDesign } from "@/lib/qr-options";
+import { qrUnlocked } from "@/lib/payments";
+import { TEMPLATES } from "@/lib/print-templates";
+import { previewTarget, qrSvg, qrTarget } from "@/lib/qr";
+import { shopDesign, type QrDesign } from "@/lib/qr-design";
 import { getAllListingsForShop, type ListingWithImages } from "@/lib/shops";
 import { PrintButton } from "./PrintButton";
 
@@ -17,13 +19,19 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-function Qr({ value, design, logo, className = "" }: { value: string; design: QrDesign; logo: string | null; className?: string }) {
-  return (
-    <div
-      className={`[&>svg]:block [&>svg]:h-full [&>svg]:w-full ${className}`}
-      dangerouslySetInnerHTML={{ __html: qrSvg(value, { style: design.style, fg: design.fg, margin: 2, logo }) }}
-    />
-  );
+/** What every template needs: the saved design, a code renderer and the link for an item. */
+type Kit = {
+  shop: Shop;
+  design: QrDesign;
+  locked: boolean;
+  /** SVG for a link. `framed` draws the design's frame around it. */
+  code: (value: string, framed?: boolean) => string;
+  /** The link a code should open: real once unlocked, a myQR preview page before that. */
+  link: (slug?: string) => string;
+};
+
+function Qr({ svg, className = "" }: { svg: string; className?: string }) {
+  return <div className={`select-none [&>svg]:block [&>svg]:h-full [&>svg]:w-full ${className}`} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 function chunk<T>(list: T[], size: number) {
@@ -32,50 +40,91 @@ function chunk<T>(list: T[], size: number) {
   return out.length ? out : [[]];
 }
 
+function inkFill(design: QrDesign) {
+  return design.fg2 ? `linear-gradient(90deg, ${design.fg}, ${design.fg2})` : design.fg;
+}
+
 export default async function PrintPage({ params, searchParams }: Props) {
   const { template } = await params;
   const meta = TEMPLATES.find((t) => t.id === template);
   if (!meta) notFound();
   const { shop } = await requireSeller();
   const sp = await searchParams;
-  const design = parseQrDesign(sp);
-  const logo = design.logo ? shop.logoUrl : null;
+  const locked = !qrUnlocked(shop);
+  const design = shopDesign(shop);
+  const base = shopUrl(shop.subdomain);
+
+  const kit: Kit = {
+    shop,
+    design,
+    locked,
+    code: (value, framed = false) =>
+      qrSvg(value, {
+        ...design,
+        withFrame: framed,
+        margin: framed ? undefined : 2,
+        logoHref: shop.logoUrl,
+        watermark: locked,
+        subtitle: shopHost(shop.subdomain),
+      }),
+    link: (slug) => (locked ? previewTarget(shop.subdomain, slug) : qrTarget(base, slug ? `/p/${slug}` : "")),
+  };
 
   const listings = (await getAllListingsForShop(shop.id)).filter((l) => l.status === "active");
   const one = typeof sp.item === "string" ? listings.find((l) => l.id === sp.item) : undefined;
   const items = sp.items === "all" || !sp.items ? listings : listings.filter((l) => String(sp.items).split(",").includes(l.id));
-
-  const base = shopUrl(shop.subdomain);
-  const target = qrTarget(base, one ? `/p/${one.slug}` : "");
+  const target = kit.link(one?.slug);
   const address = one ? `${shopHost(shop.subdomain)}/p/${one.slug}` : shopHost(shop.subdomain);
   const landscape = template === "tent";
 
   return (
     <div className="min-h-dvh bg-[#e7e8e2] print:bg-white">
-      <style>{`@page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 0; } @media print { html, body { background: #fff !important; } }`}</style>
+      <style>{`@page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 0; } @media print { html, body { background: #fff !important; } ${
+        locked ? ".locked-sheets { display: none !important; } .locked-print-note { display: block !important; }" : ""
+      } }`}</style>
+
       <div className="no-print sticky top-0 z-10 border-b border-line bg-card">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div>
-            <p className="font-bold">{meta.name}</p>
-            <p className="text-sm text-ink-soft">Print at 100% (actual size) on A4. Turn off &ldquo;fit to page&rdquo; and headers/footers.</p>
+            <p className="font-bold">
+              {meta.name}
+              {locked && <span className="ml-2 rounded-full bg-sticker px-2 py-0.5 align-middle text-xs font-bold">Preview</span>}
+            </p>
+            <p className="text-sm text-ink-soft">
+              {locked
+                ? "This is how your sheet will look. Printing unlocks when your shop is published."
+                : "Print at 100% (actual size) on A4. Turn off “fit to page” and headers/footers."}
+            </p>
           </div>
           <div className="flex gap-2">
             <Link href={`/dashboard/qr${one ? `?item=${one.id}` : ""}`} className="btn btn-outline btn-sm">
               Back
             </Link>
-            <PrintButton />
+            {locked ? (
+              <Link href="/dashboard#publish" className="btn btn-primary btn-sm">
+                Publish to print
+              </Link>
+            ) : (
+              <PrintButton />
+            )}
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-8 py-8 print:block print:p-0">
-        {template === "sign" && <Sign shop={shop} design={design} logo={logo} target={target} address={address} product={one} />}
-        {template === "tent" && <Tent shop={shop} design={design} logo={logo} target={target} address={address} />}
-        {template === "cards" && <Cards shop={shop} design={design} logo={logo} target={target} address={address} />}
-        {template === "stickers" && <Stickers design={design} logo={logo} target={target} address={address} />}
+      {locked && (
+        <div className="locked-print-note hidden p-[20mm] text-center text-[16pt]">
+          This is a preview. Publish your shop on myQR to print your QR codes.
+        </div>
+      )}
+
+      <div className="locked-sheets flex flex-col items-center gap-8 py-8 print:block print:p-0">
+        {template === "sign" && <Sign kit={kit} target={target} address={address} product={one} />}
+        {template === "tent" && <Tent kit={kit} target={target} address={address} />}
+        {template === "cards" && <Cards kit={kit} target={target} address={address} />}
+        {template === "stickers" && <Framed kit={kit} target={target} address={address} />}
         {template === "tags" &&
           (items.length ? (
-            chunk(items, 12).map((page, i) => <Tags key={i} shop={shop} design={design} logo={logo} base={base} items={page} />)
+            chunk(items, 12).map((page, i) => <Tags key={i} kit={kit} items={page} />)
           ) : (
             <p className="no-print text-ink-soft">No products are for sale yet.</p>
           ))}
@@ -86,24 +135,21 @@ export default async function PrintPage({ params, searchParams }: Props) {
 
 const sheet = "print-sheet relative overflow-hidden bg-white text-[#111] shadow-[0_6px_30px_rgb(0_0_0/0.12)] print:break-after-page";
 
-function Sign({
-  shop,
-  design,
-  logo,
-  target,
-  address,
-  product,
-}: {
-  shop: Shop;
-  design: QrDesign;
-  logo: string | null;
-  target: string;
-  address: string;
-  product?: ListingWithImages;
-}) {
+/** Big diagonal mark across a whole sheet in preview mode. */
+function SheetMark({ locked }: { locked: boolean }) {
+  if (!locked) return null;
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 grid place-items-center overflow-hidden">
+      <p className="font-wide -rotate-[35deg] whitespace-nowrap text-[86pt] text-[#191C3A] opacity-[0.07]">PREVIEW</p>
+    </div>
+  );
+}
+
+function Sign({ kit, target, address, product }: { kit: Kit; target: string; address: string; product?: ListingWithImages }) {
+  const { shop, design } = kit;
   return (
     <section className={sheet} style={{ width: "210mm", height: "297mm" }}>
-      <div style={{ height: "9mm", background: design.fg }} />
+      <div style={{ height: "9mm", background: inkFill(design) }} />
       <div className="flex h-[288mm] flex-col px-[18mm] pb-[14mm] pt-[14mm]">
         <div className="flex items-center gap-[5mm]">
           {shop.logoUrl && (
@@ -118,7 +164,7 @@ function Sign({
           {product ? `${product.title}, ${formatPrice(product.priceCents)}` : design.cta}
         </p>
         <div className="mx-auto mt-[8mm]" style={{ width: "162mm", height: "162mm" }}>
-          <Qr value={target} design={design} logo={logo} className="h-full w-full" />
+          <Qr svg={kit.code(target)} className="h-full w-full" />
         </div>
         <p className="font-narrow mt-[6mm] text-center font-bold" style={{ fontSize: "20pt" }}>
           {address}
@@ -133,15 +179,17 @@ function Sign({
           )}
         </p>
       </div>
+      <SheetMark locked={kit.locked} />
     </section>
   );
 }
 
-function TentPanel({ shop, design, logo, target, address }: { shop: Shop; design: QrDesign; logo: string | null; target: string; address: string }) {
+function TentPanel({ kit, target, address }: { kit: Kit; target: string; address: string }) {
+  const { shop, design } = kit;
   return (
     <div className="flex h-full items-center gap-[10mm] px-[16mm]">
       <div style={{ width: "88mm", height: "88mm" }} className="shrink-0">
-        <Qr value={target} design={design} logo={logo} className="h-full w-full" />
+        <Qr svg={kit.code(target)} className="h-full w-full" />
       </div>
       <div className="min-w-0">
         {shop.logoUrl && (
@@ -162,7 +210,7 @@ function TentPanel({ shop, design, logo, target, address }: { shop: Shop; design
   );
 }
 
-function Tent(props: { shop: Shop; design: QrDesign; logo: string | null; target: string; address: string }) {
+function Tent(props: { kit: Kit; target: string; address: string }) {
   return (
     <section className={sheet} style={{ width: "297mm", height: "210mm" }}>
       <div className="flex h-full flex-col">
@@ -176,18 +224,21 @@ function Tent(props: { shop: Shop; design: QrDesign; logo: string | null; target
       </div>
       <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-[#bbb]" aria-hidden="true" />
       <p className="no-print absolute right-3 top-1/2 -translate-y-1/2 bg-white px-2 text-xs text-[#888]">Fold here</p>
+      <SheetMark locked={props.kit.locked} />
     </section>
   );
 }
 
-function Cards({ shop, design, logo, target, address }: { shop: Shop; design: QrDesign; logo: string | null; target: string; address: string }) {
+function Cards({ kit, target, address }: { kit: Kit; target: string; address: string }) {
+  const { shop, design } = kit;
+  const svg = kit.code(target);
   return (
     <section className={sheet} style={{ width: "210mm", height: "297mm" }}>
       <div className="grid grid-cols-2" style={{ padding: "11mm 20mm", gridAutoRows: "55mm", gridTemplateColumns: "85mm 85mm" }}>
         {Array.from({ length: 10 }, (_, i) => (
           <div key={i} className="flex items-center gap-[4mm] border border-dashed border-[#ccc] px-[4mm]">
             <div style={{ width: "40mm", height: "40mm" }} className="shrink-0">
-              <Qr value={target} design={design} logo={logo} className="h-full w-full" />
+              <Qr svg={svg} className="h-full w-full" />
             </div>
             <div className="min-w-0">
               <p className="font-semiwide" style={{ fontSize: shop.name.length > 20 ? "10pt" : "12pt", lineHeight: 1.1 }}>
@@ -203,30 +254,36 @@ function Cards({ shop, design, logo, target, address }: { shop: Shop; design: Qr
           </div>
         ))}
       </div>
+      <SheetMark locked={kit.locked} />
     </section>
   );
 }
 
-function Stickers({ design, logo, target, address }: { design: QrDesign; logo: string | null; target: string; address: string }) {
+/** The code in its chosen frame, 12 to a page, for sticker paper and tags. */
+function Framed({ kit, target, address }: { kit: Kit; target: string; address: string }) {
+  const framed = kit.design.frame !== "none";
+  const svg = kit.code(target, true);
   return (
     <section className={sheet} style={{ width: "210mm", height: "297mm" }}>
-      <div className="grid" style={{ padding: "13.5mm 15mm", gridTemplateColumns: "repeat(4, 45mm)", gridAutoRows: "45mm" }}>
-        {Array.from({ length: 24 }, (_, i) => (
-          <div key={i} className="flex flex-col items-center justify-center border border-dashed border-[#ddd]">
-            <div style={{ width: "34mm", height: "34mm" }}>
-              <Qr value={target} design={design} logo={logo} className="h-full w-full" />
-            </div>
-            <p className="font-narrow mt-[1mm] max-w-[42mm] truncate font-bold" style={{ fontSize: "6.5pt" }}>
-              {address}
-            </p>
+      <div className="grid" style={{ padding: "8.5mm 10.5mm", gridTemplateColumns: "repeat(3, 63mm)", gridAutoRows: "70mm" }}>
+        {Array.from({ length: 12 }, (_, i) => (
+          <div key={i} className="flex flex-col items-center justify-center border border-dashed border-[#ddd] p-[3mm]">
+            <Qr svg={svg} className={framed ? "h-[62mm] w-[55mm]" : "h-[52mm] w-[52mm]"} />
+            {!framed && (
+              <p className="font-narrow mt-[2mm] max-w-[56mm] truncate font-bold" style={{ fontSize: "8pt" }}>
+                {address}
+              </p>
+            )}
           </div>
         ))}
       </div>
+      <SheetMark locked={kit.locked} />
     </section>
   );
 }
 
-function Tags({ shop, design, logo, base, items }: { shop: Shop; design: QrDesign; logo: string | null; base: string; items: ListingWithImages[] }) {
+function Tags({ kit, items }: { kit: Kit; items: ListingWithImages[] }) {
+  const { shop, design } = kit;
   return (
     <section className={sheet} style={{ width: "210mm", height: "297mm" }}>
       <div className="grid" style={{ padding: "8.5mm 10.5mm", gridTemplateColumns: "repeat(3, 63mm)", gridAutoRows: "70mm" }}>
@@ -240,7 +297,7 @@ function Tags({ shop, design, logo, base, items }: { shop: Shop; design: QrDesig
             </p>
             <div className="mt-auto flex items-end gap-[3mm]">
               <div style={{ width: "30mm", height: "30mm" }} className="shrink-0">
-                <Qr value={qrTarget(base, `/p/${l.slug}`)} design={design} logo={logo} className="h-full w-full" />
+                <Qr svg={kit.code(kit.link(l.slug))} className="h-full w-full" />
               </div>
               <p className="min-w-0" style={{ fontSize: "7.5pt", lineHeight: 1.25 }}>
                 <span className="font-semibold" style={{ color: design.fg }}>
@@ -254,6 +311,7 @@ function Tags({ shop, design, logo, base, items }: { shop: Shop; design: QrDesig
           </div>
         ))}
       </div>
+      <SheetMark locked={kit.locked} />
     </section>
   );
 }

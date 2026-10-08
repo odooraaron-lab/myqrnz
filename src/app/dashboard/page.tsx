@@ -7,8 +7,9 @@ import { db } from "@/db";
 import { enquiries, listings, shopVisits } from "@/db/schema";
 import { requireSeller } from "@/lib/auth";
 import { nzToday } from "@/lib/format";
-import { setupFeeRequired } from "@/lib/payments";
-import { qrTarget } from "@/lib/qr";
+import { qrUnlocked, setupFeeRequired } from "@/lib/payments";
+import { previewTarget, qrTarget } from "@/lib/qr";
+import { shopDesign } from "@/lib/qr-design";
 import { publishShopAction } from "./actions";
 
 export const metadata = { title: "Overview" };
@@ -139,14 +140,22 @@ export default async function DashboardHome({
         </div>
 
         <div className="panel flex items-center gap-5 self-start p-6">
-          <QrCode value={qrTarget(url)} margin={1} className="w-28 shrink-0 sm:w-32" fg="#191c3a" />
+          <QrCode
+            value={qrUnlocked(shop) ? qrTarget(url) : previewTarget(shop.subdomain)}
+            {...shopDesign(shop)}
+            frame="none"
+            margin={1}
+            logoHref={shop.logoUrl}
+            watermark={!qrUnlocked(shop)}
+            className="w-28 shrink-0 sm:w-32"
+          />
           <div>
             <h2 className="text-lg font-bold">Your QR code</h2>
             <p className="mt-1 text-sm text-ink-soft">
-              {live ? "Ready to print." : "Print it now — it starts working the moment you publish."}
+              {qrUnlocked(shop) ? "Ready to download and print." : "Preview only. Design it now; it unlocks when you publish."}
             </p>
             <Link href="/dashboard/qr" className="btn btn-outline btn-sm mt-3">
-              Print signs and cards
+              {qrUnlocked(shop) ? "Print signs and cards" : "Design your code"}
             </Link>
           </div>
         </div>

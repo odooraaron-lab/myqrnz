@@ -12,7 +12,8 @@ A seller signs up at **myqr.co.nz**, picks a shop name and an address (`anna` �
 | Accounts | `src/app/(auth)` | Register (shop name, address, email, password), log in/out, password reset by email |
 | Dashboard | `src/app/dashboard` | Overview + checklist + stats, shop design (themes, logo, cover, contact, SEO), products, QR studio, enquiries inbox, account |
 | Storefronts | `src/app/s/[shop]` | Each shop at `<name>.myqr.co.nz`: home, product pages, order requests, per-shop SEO, sitemap, robots, share card |
-| QR codes | `src/lib/qr.ts`, `src/app/dashboard/qr`, `src/app/print` | Styled codes (classic / soft / dots, colour, logo), PNG/SVG downloads, A4 sign, A5 table tent, counter cards, small codes, product price tags |
+| QR codes | `src/lib/qr.ts`, `src/lib/qr-design.ts`, `src/app/dashboard/qr`, `src/app/print` | 8 patterns, 5 corner frames × 5 corner centres, solid/gradient/radial colour, corner colour, light backgrounds, 6 frames with custom words, centre logo, 9 ready-made looks; saved per shop; PNG/SVG downloads and A4 print sheets |
+| Preview mode | `src/lib/payments.ts` (`qrUnlocked`), `src/app/(marketing)/preview` | Until a shop is live (and paid, once payments are on) every code is a watermarked preview that opens a myQR preview page, not the shop. Downloads and printing unlock on publish |
 | Platform admin | `src/app/admin` | All shops, search, suspend/restore, weekly numbers. Access via `ADMIN_EMAILS` |
 | Payments | `src/lib/payments.ts` | **Not wired up yet** — the single place Stripe goes (see below) |
 

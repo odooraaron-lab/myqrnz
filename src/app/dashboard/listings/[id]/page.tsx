@@ -4,7 +4,9 @@ import { PageHead } from "@/components/dashboard/PageHead";
 import { QrCode } from "@/components/QrCode";
 import { shopUrl } from "@/config/site";
 import { requireSeller } from "@/lib/auth";
-import { qrTarget } from "@/lib/qr";
+import { qrUnlocked } from "@/lib/payments";
+import { previewTarget, qrTarget } from "@/lib/qr";
+import { shopDesign } from "@/lib/qr-design";
 import { getListingForShop, shopCategories } from "@/lib/shops";
 import { deleteListingAction } from "../actions";
 import { ListingForm } from "../ListingForm";
@@ -62,8 +64,20 @@ export default async function EditListingPage({
         <aside className="space-y-6">
           <div className="panel p-5">
             <p className="font-bold">This product&apos;s QR code</p>
-            <QrCode value={qrTarget(shopUrl(shop.subdomain), `/p/${listing.slug}`)} margin={1} fg="#191c3a" className="mt-3 w-full" />
-            <p className="mt-3 text-sm text-ink-soft">Opens this product directly. Put it beside the item on your table.</p>
+            <QrCode
+              value={qrUnlocked(shop) ? qrTarget(shopUrl(shop.subdomain), `/p/${listing.slug}`) : previewTarget(shop.subdomain, listing.slug)}
+              {...shopDesign(shop)}
+              frame="none"
+              margin={1}
+              logoHref={shop.logoUrl}
+              watermark={!qrUnlocked(shop)}
+              className="mt-3 w-full"
+            />
+            <p className="mt-3 text-sm text-ink-soft">
+              {qrUnlocked(shop)
+                ? "Opens this product directly. Put it beside the item on your table."
+                : "Preview. Once your shop is published this code opens the product directly."}
+            </p>
           </div>
           <form action={deleteListingAction} className="panel p-5">
             <input type="hidden" name="id" value={listing.id} />
