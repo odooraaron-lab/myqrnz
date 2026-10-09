@@ -15,7 +15,9 @@ A seller signs up at **myqr.co.nz**, picks a shop name and an address (`anna` �
 | QR codes | `src/lib/qr.ts`, `src/lib/qr-design.ts`, `src/app/dashboard/qr`, `src/app/print` | 8 patterns, 5 corner frames × 5 corner centres, solid/gradient/radial colour, corner colour, light backgrounds, 6 frames with custom words, centre logo, 9 ready-made looks; saved per shop; PNG/SVG downloads and A4 print sheets |
 | Preview mode | `src/lib/payments.ts` (`qrUnlocked`), `src/app/(marketing)/preview` | Until a shop is live (and paid, once payments are on) every code is a watermarked preview that opens a myQR preview page, not the shop. Downloads and printing unlock on publish |
 | Platform admin | `src/app/admin` | All shops, search, suspend/restore, weekly numbers. Access via `ADMIN_EMAILS` |
-| Payments | `src/lib/payments.ts` | **Not wired up yet** — the single place Stripe goes (see below) |
+| Orders | `src/lib/orders.ts`, `src/app/dashboard/orders`, `src/app/s/[shop]/order` | Buy now on product pages (Stripe Checkout on your account), stock held during checkout, seller order tracking (send / ready / collected / refund), buyer tracking page and emails |
+| Balances & payouts | `src/lib/money.ts`, `src/lib/payouts.ts`, `src/app/dashboard/balance`, `src/app/admin/payouts` | Per-seller ledger with fees, hold period, statement and running balance; payout requests; admin pays by Stripe Connect transfer or bank transfer |
+| Setup fee | `src/lib/payments.ts` | "Pay $49 and publish" checkout; the webhook publishes the shop |
 
 ### How subdomains work
 
@@ -65,13 +67,33 @@ Change the schema in `src/db/schema.ts`, then run `npm run db:generate` to creat
 
 Set in `src/config/site.ts` (`setupFee`, `platformFeePercent`). They're placeholders ($49 and 3%) — the marketing pages, structured data, dashboard and receipt graphic all read from there.
 
-## Adding Stripe later
+## Payments, balances and payouts
 
-Everything money-related routes through `src/lib/payments.ts`:
+How the money moves:
 
-1. **Setup fee** — implement `startSetupCheckout()` to create a Stripe Checkout Session and return its URL. Add a webhook route for `checkout.session.completed` that sets `shops.setup_paid_at` and `status = 'live'`. Then set `PAYMENTS_ENABLED=true`; the dashboard's publish button already switches to "Pay $49 and publish".
-2. **Seller payouts** — Stripe Connect (Express). Store each shop's connected account id, onboard from the dashboard, and create product checkouts as destination charges with `application_fee_amount = price × platformFeePercent`.
-3. **Checkout** — product pages currently send an order request (saved to the seller's inbox and emailed). Swap the "Order this item" button for a checkout when payments are on.
+1. **Customer pays you.** "Buy now" opens Stripe Checkout on your Stripe account. The item is held for 30 minutes while they pay.
+2. **The webhook records the sale** (`/api/stripe/webhook`): the order is marked paid, both parties are emailed, and the seller's ledger gets the sale (+) and the myQR fee (−). Both are held for `PAYOUT_HOLD_DAYS` (default 7).
+3. **Seller's balance**: *available* (past the hold), *on hold*, and *paid out*, with a statement showing every sale, fee, refund, dispute and withdrawal and the running balance. Refunds and card disputes come straight off the balance; the fee on a refunded amount is returned.
+4. **Seller requests a payout** (minimum `PAYOUT_MINIMUM`, one open request at a time; enforced in the database).
+5. **You process it at `/admin/payouts`**:
+   - **Send with Stripe** (`STRIPE_CONNECT_ENABLED=true`): a Stripe transfer to the seller's connected account; Stripe pays their bank. Sellers verify once from their Balance page. Their account has no Stripe dashboard or login and you carry Stripe's fees and losses, so to them it's just "verify your bank account".
+   - **Mark paid**: you paid them by internet banking; record the reference.
+   - **Return**: declines the request and puts the money back in their balance.
+
+Every webhook handler is idempotent (ledger entries have unique refs), so Stripe retries can't double-count.
+
+### Turning it on
+
+1. In Stripe (test mode first), copy the secret key into `STRIPE_SECRET_KEY`.
+2. Developers → Webhooks → add endpoint `https://myqr.co.nz/api/stripe/webhook` with events `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired`, `charge.refunded`, `charge.refund.updated`, `charge.dispute.created`, `charge.dispute.closed`. Put its signing secret in `STRIPE_WEBHOOK_SECRET`.
+3. For Stripe payouts: enable Connect (Settings → Connect, platform/marketplace, New Zealand), then add a second endpoint at the same URL listening to **connected accounts** for `account.updated`, with its secret in `STRIPE_CONNECT_WEBHOOK_SECRET`. Set `STRIPE_CONNECT_ENABLED=true`.
+4. Set `PAYMENTS_ENABLED=true` and redeploy.
+
+Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook` and use its `whsec_…` secret.
+
+**Fees.** `platformFeePercent` and `platformFeeFixedCents` in `src/config/site.ts`. Stripe charges NZ cards about 2.65% + 30c out of your share, and the admin page shows your actual margin after Stripe fees.
+
+**Why Connect.** Stripe's terms restrict marketplaces that collect payments for other sellers and pay them out without Connect (see Stripe's "aggregation" guidance). Bank-transfer mode works, but Connect is the supported route.
 
 ## Project layout
 
@@ -80,7 +102,7 @@ src/
   proxy.ts                 host → storefront rewrite
   config/site.ts           domain, prices, fees
   db/                      Drizzle schema + client
-  lib/                     auth, qr, themes, seo, storage, email, payments
+  lib/                     auth, qr, themes, seo, storage, email, stripe, orders, money, payouts
   content/                 guides and FAQ copy
   components/              shared UI (marketing, dashboard, storefront)
   app/(marketing)          public site

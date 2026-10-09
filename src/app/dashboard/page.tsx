@@ -4,9 +4,11 @@ import { CopyButton } from "@/components/dashboard/CopyButton";
 import { QrCode } from "@/components/QrCode";
 import { shopHost, shopUrl, site } from "@/config/site";
 import { db } from "@/db";
-import { enquiries, listings, shopVisits } from "@/db/schema";
+import { enquiries, listings, orders, shopVisits } from "@/db/schema";
 import { requireSeller } from "@/lib/auth";
-import { nzToday } from "@/lib/format";
+import { formatPrice, nzToday } from "@/lib/format";
+import { getBalance } from "@/lib/money";
+import { paymentsLive } from "@/lib/stripe";
 import { qrUnlocked, setupFeeRequired } from "@/lib/payments";
 import { previewTarget, qrTarget } from "@/lib/qr";
 import { shopDesign } from "@/lib/qr-design";
@@ -48,6 +50,13 @@ export default async function DashboardHome({
       .where(and(eq(shopVisits.shopId, shop.id), gte(shopVisits.day, days[0]))),
   ]);
 
+  const selling = paymentsLive() && shop.status === "live";
+  const [balance, [{ toSend }]] = selling
+    ? await Promise.all([
+        getBalance(shop.id),
+        db.select({ toSend: count() }).from(orders).where(and(eq(orders.shopId, shop.id), eq(orders.status, "paid"))),
+      ])
+    : [null, [{ toSend: 0 }]];
   const active = listingCounts.find((l) => l.status === "active")?.n ?? 0;
   const totalListings = listingCounts.reduce((a, l) => a + l.n, 0);
   const byDay = days.map((day) => ({
@@ -166,14 +175,30 @@ export default async function DashboardHome({
           This week
         </h2>
         <dl className="grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-4">
-          {[
-            ["QR scans, last 7 days", scans7],
-            ["Visits, last 7 days", visits7],
-            ["Products for sale", active],
-            ["Unread enquiries", unread],
-          ].map(([label, value]) => (
-            <div key={label} className="bg-card p-5">
-              <dt className="text-sm text-ink-soft">{label}</dt>
+          {(selling
+            ? [
+                ["Orders to send", toSend, "/dashboard/orders"],
+                ["Available to withdraw", formatPrice(balance!.availableCents), "/dashboard/balance"],
+                ["QR scans, last 7 days", scans7, null],
+                ["Visits, last 7 days", visits7, null],
+              ]
+            : [
+                ["QR scans, last 7 days", scans7, null],
+                ["Visits, last 7 days", visits7, null],
+                ["Products for sale", active, "/dashboard/listings"],
+                ["Unread enquiries", unread, "/dashboard/enquiries"],
+              ]
+          ).map(([label, value, href]) => (
+            <div key={String(label)} className="relative bg-card p-5">
+              <dt className="text-sm text-ink-soft">
+                {href ? (
+                  <Link href={String(href)} className="after:absolute after:inset-0 hover:text-ink">
+                    {label}
+                  </Link>
+                ) : (
+                  label
+                )}
+              </dt>
               <dd className="font-wide mt-2 text-3xl">{value}</dd>
             </div>
           ))}

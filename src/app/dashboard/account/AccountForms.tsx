@@ -36,6 +36,7 @@ export function DeleteAccountForm({ subdomain }: { subdomain: string }) {
     <details className="panel mt-6 border-stop/40 p-6 sm:p-7">
       <summary className="cursor-pointer text-lg font-bold text-stop">Delete account and shop</summary>
       <form action={action} className="mt-5 max-w-lg space-y-5">
+        <FormMessage state={state} />
         <p className="text-[0.9375rem] text-ink-soft">
           This permanently deletes your shop, products, photos and enquiries. Printed QR codes will stop working and the
           address may be claimed by someone else. This can&apos;t be undone.

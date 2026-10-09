@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 
 const ITEMS = [
   { href: "/dashboard", label: "Overview", exact: true },
+  { href: "/dashboard/orders", label: "Orders", badgeKey: "orders" as const },
+  { href: "/dashboard/balance", label: "Balance" },
   { href: "/dashboard/listings", label: "Products" },
   { href: "/dashboard/shop", label: "Shop design" },
   { href: "/dashboard/qr", label: "QR codes" },
@@ -12,7 +14,7 @@ const ITEMS = [
   { href: "/dashboard/account", label: "Account" },
 ];
 
-export function DashboardNav({ unread, isAdmin }: { unread: number; isAdmin: boolean }) {
+export function DashboardNav({ unread, toSend, isAdmin }: { unread: number; toSend: number; isAdmin: boolean }) {
   const path = usePathname();
   const items = isAdmin ? [...ITEMS, { href: "/admin", label: "Platform admin" }] : ITEMS;
   return (
@@ -30,13 +32,13 @@ export function DashboardNav({ unread, isAdmin }: { unread: number; isAdmin: boo
                 }`}
               >
                 {item.label}
-                {"badgeKey" in item && unread > 0 && (
+                {"badgeKey" in item && (item.badgeKey === "orders" ? toSend : unread) > 0 && (
                   <span
                     className={`min-w-6 rounded-full px-1.5 text-center text-xs font-bold leading-5 ${
                       active ? "bg-sticker text-ink" : "bg-cobalt text-white"
                     }`}
                   >
-                    {unread}
+                    {item.badgeKey === "orders" ? toSend : unread}
                   </span>
                 )}
               </Link>

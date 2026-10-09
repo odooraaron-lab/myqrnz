@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { count, desc, eq, gte, sql } from "drizzle-orm";
-import Link from "next/link";
-import { Logo } from "@/components/Logo";
 import { shopHost, shopUrl, site } from "@/config/site";
 import { db } from "@/db";
 import { enquiries, listings, shops, shopVisits, users } from "@/db/schema";
@@ -12,7 +10,7 @@ import { setShopStatusAction } from "./actions";
 export const metadata: Metadata = { title: "Platform admin", robots: { index: false } };
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const admin = await requireAdmin();
+  await requireAdmin();
   const { q } = await searchParams;
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const weekAgoDay = new Date(new Date(`${nzToday()}T00:00:00Z`).getTime() - 6 * 864e5).toISOString().slice(0, 10);
@@ -54,22 +52,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   ];
 
   return (
-    <div className="min-h-dvh">
-      <header className="border-b border-line bg-card">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-4">
-            <Logo href="/admin" />
-            <span className="rounded-full bg-ink px-2.5 py-0.5 text-xs font-semibold text-white">Platform admin</span>
-          </div>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="hidden text-ink-soft sm:inline">{admin.email}</span>
-            <Link href="/dashboard" className="font-semibold underline underline-offset-2">
-              My shop
-            </Link>
-          </div>
-        </div>
-      </header>
-
+    <>
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <h1 className="font-semiwide text-3xl">Every shop on {site.rootDomain}</h1>
 
@@ -150,6 +133,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           </table>
         </div>
       </main>
-    </div>
+    </>
   );
 }

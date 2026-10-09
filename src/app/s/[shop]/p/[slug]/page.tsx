@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { JsonLd } from "@/components/JsonLd";
 import { EnquiryForm } from "@/components/storefront/EnquiryForm";
+import { BuyBox } from "@/components/storefront/BuyBox";
 import { Gallery } from "@/components/storefront/Gallery";
 import { ProductCard } from "@/components/storefront/ProductCard";
 import { StripQrParam } from "@/components/storefront/StripQrParam";
@@ -12,11 +13,13 @@ import { shopUrl } from "@/config/site";
 import { formatPrice } from "@/lib/format";
 import { listingSeoDescription, listingSeoTitle } from "@/lib/seo";
 import { getPublicListing, getPublicListings, recordVisit } from "@/lib/shops";
+import { MAX_QTY } from "@/lib/orders";
 import { absoluteAsset, loadStorefront } from "@/lib/storefront";
+import { paymentsLive } from "@/lib/stripe";
 
 type Props = {
   params: Promise<{ shop: string; slug: string }>;
-  searchParams: Promise<{ qr?: string }>;
+  searchParams: Promise<{ qr?: string; checkout?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -49,7 +52,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 function availability(quantity: number | null, status: string) {
-  if (status === "sold" || quantity === 0) return { label: "Sold", schema: "https://schema.org/SoldOut", inStock: false };
+  if (status === "sold") return { label: "Sold", schema: "https://schema.org/SoldOut", inStock: false };
+  // Stock is held while someone else is at checkout.
+  if (quantity === 0) return { label: "Someone is checking out with the last one. Check back in half an hour.", schema: "https://schema.org/SoldOut", inStock: false };
   if (quantity === null) return { label: "Available to order", schema: "https://schema.org/InStock", inStock: true };
   if (quantity === 1) return { label: "One available", schema: "https://schema.org/LimitedAvailability", inStock: true };
   return { label: `${quantity} available`, schema: "https://schema.org/InStock", inStock: true };
@@ -70,6 +75,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
   }
 
   const avail = availability(listing.quantity, listing.status);
+  const canBuy = paymentsLive();
   const others = (await getPublicListings(shop.id)).filter((l) => l.id !== listing.id && l.status === "active").slice(0, 4);
   const url = shopUrl(sub, `/p/${listing.slug}`);
   const deliveryLines = [
@@ -109,7 +115,24 @@ export default async function ProductPage({ params, searchParams }: Props) {
             </ul>
           )}
 
-          {avail.inStock && isPublic && (
+          {sp.checkout === "cancelled" && (
+            <p role="status" className="s-card mt-6 p-3 text-sm">
+              Checkout cancelled. You haven&apos;t been charged.
+            </p>
+          )}
+
+          {avail.inStock && isPublic && canBuy && (
+            <BuyBox
+              shop={shop.subdomain}
+              listingId={listing.id}
+              priceCents={listing.priceCents}
+              shippingCents={listing.shippingCents}
+              pickup={listing.pickup}
+              maxQuantity={listing.quantity === null ? MAX_QTY : Math.min(MAX_QTY, listing.quantity)}
+              pickupNote={shop.pickupInfo}
+            />
+          )}
+          {avail.inStock && isPublic && !canBuy && (
             <a href="#order" className="s-btn mt-6 w-full sm:w-auto">
               Order this item
             </a>
@@ -125,21 +148,25 @@ export default async function ProductPage({ params, searchParams }: Props) {
       </article>
 
       <section id="order" className="mx-auto mt-16 max-w-3xl scroll-mt-6 px-4 sm:px-6">
-        <h2 className="s-heading text-2xl">{avail.inStock ? "Order this item" : "Ask about this item"}</h2>
+        <h2 className="s-heading text-2xl">{avail.inStock && !canBuy ? "Order this item" : "Ask about this item"}</h2>
         <p className="s-muted mb-5 mt-2">
-          {avail.inStock
+          {avail.inStock && !canBuy
             ? `Send your details and ${shop.name} will reply by email to arrange payment and ${listing.shippingCents === null ? "pickup" : "delivery or pickup"}.`
-            : "It's sold, but there may be more like it. Ask and the seller will reply by email."}
+            : avail.inStock
+              ? `Questions about size, colour or delivery? ${shop.name} will reply by email.`
+              : "It's sold, but there may be more like it. Ask and the seller will reply by email."}
         </p>
         {isPublic ? (
           <EnquiryForm
             shop={shop.subdomain}
             listingId={listing.id}
-            submitLabel={avail.inStock ? "Send order request" : "Send question"}
-            deliveryChoice={avail.inStock && listing.shippingCents !== null && listing.pickup}
+            submitLabel={avail.inStock && !canBuy ? "Send order request" : "Send question"}
+            deliveryChoice={avail.inStock && !canBuy && listing.shippingCents !== null && listing.pickup}
             defaultMessage={
               avail.inStock
-                ? `Hi, I'd like to order the ${listing.title} (${formatPrice(listing.priceCents)}).`
+                ? canBuy
+                  ? `Hi, I have a question about the ${listing.title}.`
+                  : `Hi, I'd like to order the ${listing.title} (${formatPrice(listing.priceCents)}).`
                 : `Hi, will you have more of the ${listing.title}?`
             }
           />

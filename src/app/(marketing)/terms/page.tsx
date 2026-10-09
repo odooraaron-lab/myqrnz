@@ -37,6 +37,13 @@ export default function TermsPage() {
           card checkout is available, a platform fee of {site.platformFeePercent}% applies to each sale. We&apos;ll give
           you at least 30 days&apos; notice before changing fees.
         </p>
+        <h2>Payments and payouts</h2>
+        <p>
+          When card checkout is on, customers pay myQR, and we collect each payment on your behalf. The sale, less our fee,
+          is added to your balance. Each sale is held for a few days (currently 7) so refunds and card disputes can be
+          covered, then you can ask for a payout to your bank account. Refunds and lost disputes come out of your balance.
+          To receive payouts you may need to verify your identity and bank account with our payments provider.
+        </p>
         <h2>Your content</h2>
         <p>
           You keep ownership of your photos, logo and descriptions. You give us permission to display them in your shop,

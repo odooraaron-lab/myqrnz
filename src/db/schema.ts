@@ -90,6 +90,13 @@ export const shops = pgTable(
     /** Saved QR code design from the QR studio. Null until the seller changes it. */
     qrDesign: jsonb("qr_design").$type<QrDesign>(),
 
+    // Where the seller's payouts go. Manual bank transfer details, or a Stripe
+    // Connect account the seller verifies once (they never get a Stripe login).
+    payoutAccountName: text("payout_account_name"),
+    payoutAccountNumber: text("payout_account_number"),
+    stripeAccountId: text("stripe_account_id"),
+    stripePayoutsReady: boolean("stripe_payouts_ready").notNull().default(false),
+
     status: text("status", { enum: ["draft", "live", "suspended"] }).notNull().default("draft"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     setupPaidAt: timestamp("setup_paid_at", { withTimezone: true }),
@@ -181,6 +188,154 @@ export const shopVisits = pgTable(
   (t) => [primaryKey({ columns: [t.shopId, t.day, t.source] })],
 );
 
+// ── Money ───────────────────────────────────────────────────────────────────
+
+export type ShippingAddress = {
+  name?: string | null;
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  postalCode?: string | null;
+  region?: string | null;
+  country?: string | null;
+};
+
+export const ORDER_STATUSES = ["pending", "paid", "shipped", "ready", "completed", "refunded", "cancelled"] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+/** One purchase of one product, paid through Stripe Checkout on the platform account. */
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    number: integer("number").generatedAlwaysAsIdentity({ startWith: 1001 }).notNull(),
+    shopId: uuid("shop_id")
+      .notNull()
+      .references(() => shops.id, { onDelete: "cascade" }),
+    listingId: uuid("listing_id").references(() => listings.id, { onDelete: "set null" }),
+    // Snapshot of what was bought, so history survives edits and deletions.
+    itemTitle: text("item_title").notNull(),
+    itemSlug: text("item_slug"),
+    unitPriceCents: integer("unit_price_cents").notNull(),
+    quantity: integer("quantity").notNull().default(1),
+    shippingCents: integer("shipping_cents").notNull().default(0),
+    totalCents: integer("total_cents").notNull(),
+    platformFeeCents: integer("platform_fee_cents").notNull(),
+    stripeFeeCents: integer("stripe_fee_cents"),
+    refundedCents: integer("refunded_cents").notNull().default(0),
+    delivery: text("delivery", { enum: ["post", "pickup"] }).notNull(),
+    status: text("status", { enum: ORDER_STATUSES }).notNull().default("pending"),
+    disputed: boolean("disputed").notNull().default(false),
+    stockReserved: boolean("stock_reserved").notNull().default(false),
+
+    buyerName: text("buyer_name"),
+    buyerEmail: text("buyer_email"),
+    buyerPhone: text("buyer_phone"),
+    buyerNote: text("buyer_note"),
+    shippingAddress: jsonb("shipping_address").$type<ShippingAddress>(),
+
+    courier: text("courier"),
+    trackingNumber: text("tracking_number"),
+    trackingUrl: text("tracking_url"),
+
+    stripeSessionId: text("stripe_session_id"),
+    stripePaymentIntentId: text("stripe_payment_intent_id"),
+    /** Unguessable token for the buyer's order-tracking link. */
+    publicToken: text("public_token").notNull(),
+
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    shippedAt: timestamp("shipped_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("orders_number_idx").on(t.number),
+    uniqueIndex("orders_token_idx").on(t.publicToken),
+    uniqueIndex("orders_session_idx").on(t.stripeSessionId),
+    index("orders_shop_idx").on(t.shopId, t.createdAt),
+    index("orders_pi_idx").on(t.stripePaymentIntentId),
+  ],
+);
+
+export const LEDGER_TYPES = [
+  "sale",
+  "fee",
+  "refund",
+  "fee_refund",
+  "dispute",
+  "dispute_won",
+  "payout",
+  "payout_reversal",
+  "adjustment",
+] as const;
+export type LedgerType = (typeof LEDGER_TYPES)[number];
+
+/**
+ * Every movement of a seller's money. Balance = sum of amounts; an entry
+ * counts towards the withdrawable balance once `available_at` has passed.
+ * `ref` makes each entry idempotent, so webhook retries can't double-count.
+ */
+export const ledgerEntries = pgTable(
+  "ledger_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    shopId: uuid("shop_id")
+      .notNull()
+      .references(() => shops.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    payoutId: uuid("payout_id"),
+    type: text("type", { enum: LEDGER_TYPES }).notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    availableAt: timestamp("available_at", { withTimezone: true }).notNull(),
+    description: text("description").notNull(),
+    ref: text("ref").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("ledger_ref_idx").on(t.ref), index("ledger_shop_idx").on(t.shopId, t.availableAt)],
+);
+
+export const PAYOUT_STATUSES = ["requested", "processing", "paid", "rejected"] as const;
+export type PayoutStatus = (typeof PAYOUT_STATUSES)[number];
+
+export const payouts = pgTable(
+  "payouts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    number: integer("number").generatedAlwaysAsIdentity({ startWith: 501 }).notNull(),
+    shopId: uuid("shop_id")
+      .notNull()
+      .references(() => shops.id, { onDelete: "cascade" }),
+    amountCents: integer("amount_cents").notNull(),
+    status: text("status", { enum: PAYOUT_STATUSES }).notNull().default("requested"),
+    method: text("method", { enum: ["stripe", "manual"] }),
+    // Bank details as they were when requested.
+    accountName: text("account_name"),
+    accountNumber: text("account_number"),
+    stripeTransferId: text("stripe_transfer_id"),
+    reference: text("reference"),
+    note: text("note"),
+    lastError: text("last_error"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).defaultNow().notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("payouts_number_idx").on(t.number),
+    index("payouts_shop_idx").on(t.shopId, t.requestedAt),
+    index("payouts_status_idx").on(t.status),
+    // One open request per shop at a time, enforced by the database.
+    uniqueIndex("payouts_one_open_idx").on(t.shopId).where(sql`status in ('requested', 'processing')`),
+  ],
+);
+
+/** Webhook events already handled, so Stripe retries are ignored. */
+export const stripeEvents = pgTable("stripe_events", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  createdAt: createdAt(),
+});
+
 // ── Relations ───────────────────────────────────────────────────────────────
 
 export const usersRelations = relations(users, ({ one }) => ({
@@ -212,3 +367,6 @@ export type Shop = typeof shops.$inferSelect;
 export type Listing = typeof listings.$inferSelect;
 export type ListingImage = typeof listingImages.$inferSelect;
 export type Enquiry = typeof enquiries.$inferSelect;
+export type Order = typeof orders.$inferSelect;
+export type LedgerEntry = typeof ledgerEntries.$inferSelect;
+export type Payout = typeof payouts.$inferSelect;

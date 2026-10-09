@@ -15,6 +15,13 @@
       "when": 1791499560590,
       "tag": "0001_qr_design",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791505096198,
+      "tag": "0002_money",
+      "breakpoints": true
     }
   ]
 }

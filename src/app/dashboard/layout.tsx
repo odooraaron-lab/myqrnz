@@ -3,7 +3,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { Logo } from "@/components/Logo";
 import { shopHost, shopUrl } from "@/config/site";
 import { db } from "@/db";
-import { enquiries } from "@/db/schema";
+import { enquiries, orders } from "@/db/schema";
 import { isAdmin, requireSeller } from "@/lib/auth";
 import { logoutAction } from "../(auth)/actions";
 import { DashboardNav } from "./DashboardNav";
@@ -19,6 +19,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .select({ unread: count() })
     .from(enquiries)
     .where(and(eq(enquiries.shopId, shop.id), isNull(enquiries.readAt)));
+  const [{ toSend }] = await db
+    .select({ toSend: count() })
+    .from(orders)
+    .where(and(eq(orders.shopId, shop.id), eq(orders.status, "paid")));
   const live = shop.status === "live";
   const viewHref = live ? shopUrl(shop.subdomain) : `/s/${shop.subdomain}`;
 
@@ -50,7 +54,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </p>
         </div>
         <div className="px-4 pb-3 lg:flex-1 lg:px-3 lg:pt-2">
-          <DashboardNav unread={unread} isAdmin={isAdmin(user)} />
+          <DashboardNav unread={unread} toSend={toSend} isAdmin={isAdmin(user)} />
         </div>
         <div className="hidden border-t border-line px-5 py-4 lg:block">
           <p className="truncate text-sm text-ink-soft" title={user.email}>

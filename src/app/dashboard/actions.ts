@@ -17,6 +17,7 @@ import {
 } from "@/lib/auth";
 import { isEmail } from "@/lib/format";
 import { setupFeeRequired, startSetupCheckout } from "@/lib/payments";
+import { getBalance } from "@/lib/money";
 import { removeImage } from "@/lib/storage";
 import { isHexColor, THEME_IDS } from "@/lib/themes";
 import { NZ_REGIONS } from "@/lib/seo";
@@ -108,10 +109,16 @@ export async function saveShopAction(_prev: FormState, form: FormData): Promise<
 }
 
 export async function publishShopAction() {
-  const { shop } = await requireSeller();
+  const { user, shop } = await requireSeller();
   if (shop.status === "suspended") redirect("/dashboard?error=suspended");
   if (setupFeeRequired(shop)) {
-    const { url } = await startSetupCheckout(shop);
+    let url: string;
+    try {
+      ({ url } = await startSetupCheckout(shop, user.email));
+    } catch (err) {
+      console.error("[setup] checkout failed", err);
+      redirect("/dashboard?error=checkout");
+    }
     redirect(url);
   }
   await db
@@ -172,6 +179,12 @@ export async function deleteAccountAction(_prev: FormState, form: FormData): Pro
   }
   if (!(await verifyPassword(String(form.get("password") ?? ""), user.passwordHash))) {
     return { errors: { password: "That password isn't right." } };
+  }
+  const balance = await getBalance(shop.id);
+  if (balance.availableCents + balance.pendingCents !== 0 || balance.openPayoutCents > 0) {
+    return {
+      message: "Your shop still has money in its balance. Withdraw it (or wait for refunds to settle) before deleting your account.",
+    };
   }
   const photos = await db
     .select({ url: listingImages.url })

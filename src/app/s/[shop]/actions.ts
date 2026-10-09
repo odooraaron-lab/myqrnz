@@ -7,7 +7,9 @@ import { rootUrl, shopUrl } from "@/config/site";
 import { db } from "@/db";
 import { enquiries, listings, users } from "@/db/schema";
 import { enquiryEmail, sendEmail } from "@/lib/email";
-import { getShopBySubdomain } from "@/lib/shops";
+import { redirect } from "next/navigation";
+import { startCheckout } from "@/lib/orders";
+import { getListingForShop, getShopBySubdomain } from "@/lib/shops";
 
 const schema = z.object({
   name: z.string().trim().min(1, "Tell the seller your name.").max(80),
@@ -94,4 +96,19 @@ export async function sendEnquiryAction(_prev: FormState, form: FormData): Promi
     ok: true,
     message: `Sent. ${shop.name} will reply to ${d.email}.`,
   };
+}
+
+// ── Buy now ────────────────────────────────────────────────────────────────
+
+export async function buyNowAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const shop = await getShopBySubdomain(String(form.get("shop") ?? ""));
+  if (!shop) return { message: "This shop isn't available." };
+  const listing = await getListingForShop(shop.id, String(form.get("listingId") ?? ""));
+  if (!listing) return { message: "This item is no longer available." };
+  const delivery = form.get("delivery") === "pickup" ? "pickup" : "post";
+  const quantity = Number(form.get("quantity") ?? 1);
+
+  const result = await startCheckout({ shop, listing, quantity, delivery });
+  if ("error" in result) return { message: result.error };
+  redirect(result.url);
 }

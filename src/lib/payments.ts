@@ -1,28 +1,54 @@
 import "server-only";
+import { rootUrl, site } from "@/config/site";
 import type { Shop } from "@/db/schema";
+import { paymentsLive, stripe } from "./stripe";
 
 /**
- * Payments are intentionally not wired up yet. Everything that will touch money
- * goes through this file so Stripe can be added in one place:
+ * How money flows:
  *
- * 1. Setup fee — `startSetupCheckout` will create a Stripe Checkout Session for
- *    the one-off fee and return its URL. A webhook (checkout.session.completed)
- *    then sets shops.setup_paid_at and publishes the shop.
- *
- * 2. Seller payouts — Stripe Connect (Express accounts). Each shop gets a
- *    connected account; product checkouts use destination charges with
- *    application_fee_amount = price × site.platformFeePercent.
+ * - Shoppers pay through Stripe Checkout on the platform's own Stripe account
+ *   (src/lib/orders.ts). The webhook records each sale and the myQR fee in the
+ *   seller's ledger (src/lib/money.ts), held for PAYOUT_HOLD_DAYS.
+ * - Sellers request a payout from their available balance. The admin sends it
+ *   with a Stripe Connect transfer (src/lib/payouts.ts) or pays by bank
+ *   transfer and marks it paid.
+ * - The one-off setup fee is a separate Checkout payment; paying it publishes
+ *   the shop.
  *
  * While PAYMENTS_ENABLED is false, shops publish without paying and shoppers
  * send enquiries instead of checking out.
  */
 
 export function setupFeeRequired(shop: Pick<Shop, "setupPaidAt">) {
-  return process.env.PAYMENTS_ENABLED === "true" && !shop.setupPaidAt;
+  return paymentsLive() && !shop.setupPaidAt;
 }
 
-export async function startSetupCheckout(_shop: Shop): Promise<{ url: string }> {
-  throw new Error("Setup fee checkout isn't connected yet. Set PAYMENTS_ENABLED=false until Stripe is added.");
+export async function startSetupCheckout(shop: Shop, email: string): Promise<{ url: string }> {
+  const session = await stripe().checkout.sessions.create(
+    {
+      mode: "payment",
+      customer_email: email,
+      client_reference_id: shop.id,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "nzd",
+            unit_amount: Math.round(site.setupFee * 100),
+            product_data: { name: `myQR shop setup: ${shop.subdomain}.${site.rootDomain.split(":")[0]}`, description: "One-off fee. No monthly fees." },
+          },
+        },
+      ],
+      metadata: { kind: "setup", shopId: shop.id },
+      payment_intent_data: { description: `myQR setup: ${shop.name}`, metadata: { kind: "setup", shopId: shop.id } },
+      success_url: rootUrl("/dashboard?published=1"),
+      cancel_url: rootUrl("/dashboard#publish"),
+      submit_type: "pay",
+    },
+    { idempotencyKey: `setup_${shop.id}_${Math.floor(Date.now() / 600000)}` },
+  );
+  if (!session.url) throw new Error("Stripe didn't return a checkout link.");
+  return { url: session.url };
 }
 
 /**
