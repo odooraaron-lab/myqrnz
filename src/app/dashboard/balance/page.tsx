@@ -227,7 +227,8 @@ export default async function BalancePage({ searchParams }: { searchParams: Prom
         <h2 className="text-base font-bold text-ink">How it works</h2>
         <p className="mt-2">
           Customers pay by card through myQR. For each sale we add the full amount to your balance and take our fee
-          ({site.platformFeePercent}%{site.platformFeeFixedCents ? ` + ${formatPrice(site.platformFeeFixedCents)}` : ""}). The money is held for{" "}
+          ({site.platformFeePercent}%{site.platformFeeFixedCents ? ` + ${formatPrice(site.platformFeeFixedCents)}` : ""}, which covers
+          card processing). The money is held for{" "}
           {HOLD_DAYS} days so refunds and card disputes can be covered, then it becomes available. Request a payout any time you
           have {formatPrice(MIN_PAYOUT_CENTS)} or more available.
         </p>

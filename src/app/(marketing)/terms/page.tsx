@@ -34,7 +34,8 @@ export default function TermsPage() {
         <h2>Fees</h2>
         <p>
           The setup fee is paid once to publish your shop and isn&apos;t refundable once your shop has been published. When
-          card checkout is available, a platform fee of {site.platformFeePercent}% applies to each sale. We&apos;ll give
+          card checkout is available, a platform fee of {site.platformFeePercent}% applies to each sale, including
+          shipping charged on it. Card processing fees are covered by this fee. We&apos;ll give
           you at least 30 days&apos; notice before changing fees.
         </p>
         <h2>Payments and payouts</h2>

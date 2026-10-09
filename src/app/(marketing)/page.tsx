@@ -145,7 +145,7 @@ export default function HomePage() {
             <p className="mt-5 max-w-[52ch] text-lg leading-relaxed text-ink-soft">
               Most website builders charge every month whether you sell or not. Market trade is seasonal, so we don&apos;t.
               A one-off ${site.setupFee} sets up your shop, and we take {site.platformFeePercent}% of each sale once card
-              checkout is on. That&apos;s it.
+              checkout is on, card fees included. That&apos;s it.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/register" className="btn btn-primary">
@@ -228,7 +228,7 @@ export default function HomePage() {
             "@type": "Offer",
             price: site.setupFee,
             priceCurrency: "NZD",
-            description: `One-off setup fee. ${site.platformFeePercent}% per sale. No monthly fees.`,
+            description: `One-off setup fee. ${site.platformFeePercent}% per sale, card fees included. No monthly fees.`,
           },
         }}
       />

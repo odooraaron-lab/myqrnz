@@ -65,7 +65,7 @@ Change the schema in `src/db/schema.ts`, then run `npm run db:generate` to creat
 
 ## Prices and fees
 
-Set in `src/config/site.ts` (`setupFee`, `platformFeePercent`). They're placeholders ($49 and 3%) — the marketing pages, structured data, dashboard and receipt graphic all read from there.
+Set in `src/config/site.ts` (`setupFee`, `platformFeePercent`). Currently $49 once and 7% per sale (card fees included) — the marketing pages, structured data, dashboard and receipt graphic all read from there.
 
 ## Payments, balances and payouts
 
@@ -91,7 +91,7 @@ Every webhook handler is idempotent (ledger entries have unique refs), so Stripe
 
 Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook` and use its `whsec_…` secret.
 
-**Fees.** `platformFeePercent` and `platformFeeFixedCents` in `src/config/site.ts`. Stripe charges NZ cards about 2.65% + 30c out of your share, and the admin page shows your actual margin after Stripe fees.
+**Fees.** `platformFeePercent` (7%) and `platformFeeFixedCents` in `src/config/site.ts`. The fee includes card processing: Stripe's charge (NZ cards about 2.65% + 30c) comes out of your share, and the admin page shows your actual margin after Stripe fees. Each order stores the fee it was sold at, so changing the rate only affects new orders.
 
 **Why Connect.** Stripe's terms restrict marketplaces that collect payments for other sellers and pay them out without Connect (see Stripe's "aggregation" guidance). Bank-transfer mode works, but Connect is the supported route.
 

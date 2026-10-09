@@ -42,7 +42,7 @@ export function Receipt({ className = "" }: { className?: string }) {
           <dd className="font-wide text-3xl">${site.setupFee}</dd>
         </div>
         <div className="flex items-baseline justify-between text-ink-soft">
-          <dt>Per sale, once checkout is on</dt>
+          <dt>Per sale, card fees included</dt>
           <dd className="font-semibold text-ink">{site.platformFeePercent}%</dd>
         </div>
       </dl>

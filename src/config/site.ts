@@ -19,9 +19,12 @@ export const site = {
 
   /** One-off fee to claim a shop address and publish. Placeholder — set your real price. */
   setupFee: 49,
-  /** Percentage taken from each sale once checkout is live. Placeholder — set your real rate. */
-  platformFeePercent: 3,
-  /** Fixed amount (cents) added to the fee on each sale. Stripe charges NZ cards about 2.65% + 30c, paid from the platform's share. */
+  /**
+   * Percentage taken from each sale. It includes card processing: Stripe's fee
+   * (NZ cards about 2.65% + 30c) is paid out of this, not by the seller.
+   */
+  platformFeePercent: 7,
+  /** Fixed amount (cents) added to the fee on each sale. */
   platformFeeFixedCents: 0,
 
   paymentsEnabled: process.env.PAYMENTS_ENABLED === "true",

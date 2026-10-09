@@ -12,7 +12,7 @@ export const FAQS: Faq[] = [
   },
   {
     q: "How much does it cost?",
-    a: `A one-off setup fee of ${fee} to claim your address and publish your shop, then ${pct} of each sale once card checkout is on. There are no monthly fees, so a quiet month costs you nothing.`,
+    a: `A one-off setup fee of ${fee} to claim your address and publish your shop, then ${pct} of each sale once card checkout is on. Card processing fees are included in that ${pct}, so there's nothing else to pay. There are no monthly fees, so a quiet month costs you nothing.`,
   },
   {
     q: "How do customers pay?",

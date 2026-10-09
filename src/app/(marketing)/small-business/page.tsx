@@ -95,7 +95,7 @@ export default function SmallBusinessPage() {
 
       <CtaBand
         title="Open your online shop this week"
-        body={`$${site.setupFee} once. ${site.platformFeePercent}% per sale. No subscriptions.`}
+        body={`$${site.setupFee} once. ${site.platformFeePercent}% per sale, card fees included. No subscriptions.`}
       />
     </>
   );
